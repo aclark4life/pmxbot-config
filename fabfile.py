@@ -110,7 +110,7 @@ def install_systemd_web_service():
 
 
 @api.task
-def update_pmxbot():
+def update():
 	install_pmxbot()
 	sudo('systemctl restart pmxbot')
 	sudo('systemctl restart pmxbot.web')
