@@ -63,6 +63,8 @@ packages = ' '.join([
 	'popquotes',
 	'wolframalpha',
 	'jaraco.pmxbot',
+	'pmxbot.webhooks',
+	'pmxbot.saysomething',
 	'pymongo',
 	'chucknorris',
 	'pmxbot-haiku',
