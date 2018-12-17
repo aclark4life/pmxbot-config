@@ -17,6 +17,7 @@ python = 'python3.6'
 
 @api.task
 def install_config():
+	bot_pass = getpass.getpass('IRC Nick password [skip]> ')
 	db_pass = getpass.getpass('MongoDB password for pmxbot [skip]> ')
 	twilio_token = getpass.getpass('Token for twilio [skip]> ')
 	google_trans_key = getpass.getpass('Google Translate key [skip]> ')
@@ -24,7 +25,9 @@ def install_config():
 	sudo('mkdir -p /etc/pmxbot')
 	files.upload_template(
 		'pmxbot.conf', '/etc/pmxbot/main.conf',
-		use_sudo=True)
+		use_sudo=True,
+		context=dict(password=bot_pass),
+	)
 	files.upload_template(
 		'web.conf', '/etc/pmxbot/web.conf',
 		use_sudo=True)
