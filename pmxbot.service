@@ -5,6 +5,7 @@ After=mongod.service network.target
 [Service]
 Environment=PORT=8000
 ExecStart=%(install_root)s/bin/pmxbot /etc/pmxbot/main.conf /etc/pmxbot/server.conf /etc/pmxbot/database.conf /etc/pmxbot/twilio.conf /etc/pmxbot/trans.conf /etc/pmxbot/wolframalpha.conf
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
