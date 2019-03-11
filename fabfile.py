@@ -12,7 +12,7 @@ host = 'kafka'
 domain = 'dcpython.org'
 env.hosts = ['.'.join((host, domain))]
 
-python = 'python3.6'
+python = 'python3.7'
 
 
 @api.task
@@ -55,9 +55,9 @@ def install_config():
 
 @api.task
 def install_python():
-	sudo('apt-add-repository -y ppa:fkrull/deadsnakes')
+	sudo('apt-add-repository -y ppa:deadsnakes/ppa')
 	sudo('apt update')
-	sudo('apt -q install -y {python}-venv'.format_map(globals()))
+	sudo(f'apt -q install -y {python}-venv')
 
 
 packages = ' '.join([
