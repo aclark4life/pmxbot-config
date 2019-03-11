@@ -135,9 +135,19 @@ def ensure_fqdn():
 
 
 @api.task
+def configure_journald():
+	"""
+	Configure journald to use the large volume for logs so the
+	logs can be persisted for much longer.
+	"""
+	sudo('mkdir /var/log/journal')
+
+
+@api.task
 def bootstrap():
 	ensure_fqdn()
 	install_config()
 	install_python()
 	install_pmxbot()
 	install_systemd_service()
+	configure_journald()
