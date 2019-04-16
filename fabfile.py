@@ -84,7 +84,7 @@ def install_pmxbot():
 	"Install pmxbot into a venv at install_root"
 	sudo(f'{python} -m venv {install_root}')
 	sudo(f'{install_root}/bin/pip install -U setuptools pip')
-	sudo(f'{install_root}/bin/pip install -U {packages}')
+	sudo(f'{install_root}/bin/pip install --upgrade-strategy=eager -U {packages}')
 
 
 @api.task
