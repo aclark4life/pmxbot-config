@@ -3,61 +3,89 @@ Install pmxbot on DCPython's Xenial server
 """
 
 import getpass
+import tempfile
+import pathlib
+import io
 
-from fabric.contrib import files
-from fabric import api
-from fabric.api import sudo, run, env
+from fabric import task
 
 host = 'kafka2'
 domain = 'dcpython.org'
-env.hosts = ['.'.join((host, domain))]
+hosts = [f'{host}.{domain}']
 
-python = 'python3.7'
+python = 'python3.8'
 
 
-@api.task
-def install_config():
+def upload_template(c, src, dest, *, mode=None, **context):
+	rnd_name = next(tempfile._get_candidate_names())
+	tmp_dest = f'/tmp/{rnd_name}'
+	template = pathlib.Path(src).read_text()
+	content = template % context
+	stream = io.StringIO(content)
+	c.put(stream, tmp_dest)
+	if is_dir(c, dest):
+		dest = pathlib.PurePosixPath(dest, pathlib.Path(src).name)
+	c.sudo(f'mv "{tmp_dest}" "{dest}"')
+	if mode is not None:
+		mode_str = oct(mode)[2:]
+		c.run(f'chmod {mode_str} {dest}')
+
+
+def exists(c, candidate):
+	cmd = f'test -f "{candidate}"'
+	return c.run(cmd, warn=True)
+
+
+def is_dir(c, candidate):
+	cmd = f'test -d "{candidate}"'
+	return c.run(cmd, warn=True)
+
+
+def sudo(c, command):
+	return c.sudo(command)
+
+
+@task(hosts=hosts)
+def install_config(c):
 	bot_pass = getpass.getpass('IRC Nick password [skip]> ')
 	db_pass = getpass.getpass('MongoDB password for pmxbot [skip]> ')
 	twilio_token = getpass.getpass('Token for twilio [skip]> ')
 	google_trans_key = getpass.getpass('Google Translate key [skip]> ')
 	wolframalpha_key = getpass.getpass('Wolfram|Alpha key [skip]> ')
-	sudo('mkdir -p /etc/pmxbot')
-	files.upload_template(
-		'pmxbot.conf', '/etc/pmxbot/main.conf',
-		use_sudo=True,
-		context=dict(password=bot_pass),
+	sudo(c, 'mkdir -p /etc/pmxbot')
+	upload_template(
+		c, 'pmxbot.conf', '/etc/pmxbot/main.conf',
+		password=bot_pass,
 	)
-	files.upload_template(
-		'web.conf', '/etc/pmxbot/web.conf',
-		use_sudo=True)
-	if not files.exists('/etc/pmxbot/server.conf'):
-		files.upload_template(
-			'server.conf', '/etc/pmxbot/server.conf',
-			use_sudo=True)
-	if db_pass or not files.exists('/etc/pmxbot/database.conf'):
-		files.upload_template(
-			'database.conf', '/etc/pmxbot/database.conf',
-			context=dict(password=db_pass), use_sudo=True, mode=0o600)
-	if twilio_token or not files.exists('/etc/pmxbot/twilio.conf'):
-		files.upload_template(
+	upload_template(c, 'web.conf', '/etc/pmxbot/web.conf')
+	if not exists(c, '/etc/pmxbot/server.conf'):
+		upload_template(c, 'server.conf', '/etc/pmxbot/server.conf')
+	if db_pass or not exists(c, '/etc/pmxbot/database.conf'):
+		upload_template(
+			c, 'database.conf', '/etc/pmxbot/database.conf',
+			password=db_pass, mode=0o600)
+	if twilio_token or not exists(c, '/etc/pmxbot/twilio.conf'):
+		upload_template(
+			c,
 			'twilio.conf', '/etc/pmxbot/twilio.conf',
-			context=dict(token=twilio_token), use_sudo=True, mode=0o600)
-	if google_trans_key or not files.exists('/etc/pmxbot/trans.conf'):
-		files.upload_template(
+			token=twilio_token, mode=0o600)
+	if google_trans_key or not exists(c, '/etc/pmxbot/trans.conf'):
+		upload_template(
+			c,
 			'trans.conf', '/etc/pmxbot/trans.conf',
-			context=dict(key=google_trans_key), use_sudo=True, mode=0o600)
-	if wolframalpha_key or not files.exists('/etc/pmxbot/wolframalpha.conf'):
-		files.upload_template(
+			key=google_trans_key, mode=0o600)
+	if wolframalpha_key or not exists(c, '/etc/pmxbot/wolframalpha.conf'):
+		upload_template(
+			c,
 			'wolframalpha.conf', '/etc/pmxbot/wolframalpha.conf',
-			context=dict(key=wolframalpha_key), use_sudo=True, mode=0o600)
+			key=wolframalpha_key, mode=0o600)
 
 
-@api.task
-def install_python():
-	sudo('apt-add-repository -y ppa:deadsnakes/ppa')
-	sudo('apt update')
-	sudo(f'apt -q install -y {python}-venv')
+@task(hosts=hosts)
+def install_python(c):
+	c.sudo('yum install -y amazon-linux-extras')
+	c.sudo(f'amazon-linux-extras enable {python}')
+	c.sudo('yum install -y python3.8')
 
 
 packages = ' '.join([
@@ -79,75 +107,75 @@ packages = ' '.join([
 install_root = '/opt/pmxbot'
 
 
-@api.task
-def install_pmxbot():
+@task(hosts=hosts)
+def install_pmxbot(c):
 	"Install pmxbot into a venv at install_root"
-	sudo(f'{python} -m venv {install_root}')
-	sudo(f'{install_root}/bin/pip install -U setuptools pip')
-	sudo(f'{install_root}/bin/pip install --upgrade-strategy=eager -U {packages}')
+	sudo(c, f'{python} -m venv {install_root}')
+	sudo(c, f'{install_root}/bin/pip install -U setuptools pip')
+	sudo(c, f'{install_root}/bin/pip install --upgrade-strategy=eager -U {packages}')
 
 
-@api.task
-def install_systemd_service():
-	files.upload_template(
+@task(hosts=hosts)
+def install_systemd_service(c):
+	upload_template(
+		c,
 		'pmxbot.service',
 		'/etc/systemd/system',
-		context=globals(),
-		use_sudo=True,
+		**globals(),
 	)
-	sudo('systemctl restart pmxbot')
-	sudo('systemctl enable pmxbot')
+	sudo(c, 'systemctl restart pmxbot')
+	sudo(c, 'systemctl enable pmxbot')
 
 
-@api.task
-def install_systemd_web_service():
-	files.upload_template(
+@task(hosts=hosts)
+def install_systemd_web_service(c):
+	upload_template(
+		c,
 		'web.conf', '/etc/pmxbot/web.conf',
-		use_sudo=True)
-	files.upload_template(
+	)
+	upload_template(
+		c,
 		'pmxbot.web.service',
 		'/etc/systemd/system',
-		context=globals(),
-		use_sudo=True,
+		**globals(),
 	)
-	sudo('systemctl restart pmxbot.web')
-	sudo('systemctl enable pmxbot.web')
+	sudo(c, 'systemctl restart pmxbot.web')
+	sudo(c, 'systemctl enable pmxbot.web')
 
 
-@api.task
-def update():
-	install_pmxbot()
-	sudo('systemctl restart pmxbot')
-	sudo('systemctl restart pmxbot.web')
+@task(hosts=hosts)
+def update(c):
+	install_pmxbot(c)
+	sudo(c, 'systemctl restart pmxbot')
+	sudo(c, 'systemctl restart pmxbot.web')
 
 
-@api.task
-def ensure_fqdn():
+@task(hosts=hosts)
+def ensure_fqdn(c):
 	"""
 	Ensure 'hostname -f' returns a fully-qualified hostname.
 	"""
-	hostname = run('hostname -f')
-	if '.' in hostname:
+	hostname = c.run('hostname -f')
+	if '.' in hostname.stdout:
 		return
-	cmd = 'sed -i -e "s/{hostname}/{hostname}.{domain} {hostname}/g" /etc/hosts'
-	cmd = cmd.format(hostname=hostname, domain=domain)
-	sudo(cmd)
+	cmd = f'sed -i -e "s/{hostname}/{hostname}.{domain} {hostname}/g" /etc/hosts'
+	sudo(c, cmd)
 
 
-@api.task
-def configure_journald():
+@task(hosts=hosts)
+def configure_journald(c):
 	"""
 	Configure journald to use the large volume for logs so the
 	logs can be persisted for much longer.
 	"""
-	sudo('mkdir /var/log/journal')
+	c.sudo('mkdir -p /var/log/journal')
 
 
-@api.task
-def bootstrap():
-	ensure_fqdn()
-	install_config()
-	install_python()
-	install_pmxbot()
-	install_systemd_service()
-	configure_journald()
+@task(hosts=hosts)
+def bootstrap(c):
+	ensure_fqdn(c)
+	install_config(c)
+	install_python(c)
+	install_pmxbot(c)
+	install_systemd_service(c)
+	configure_journald(c)
