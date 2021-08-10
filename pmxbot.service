@@ -1,6 +1,6 @@
 [Unit]
 Description=chat bot
-After=mongod.service network.target
+After=network.target
 
 [Service]
 Environment=PORT=8000
