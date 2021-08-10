@@ -8,7 +8,7 @@ from fabric.contrib import files
 from fabric import api
 from fabric.api import sudo, run, env
 
-host = 'kafka'
+host = 'kafka2'
 domain = 'dcpython.org'
 env.hosts = ['.'.join((host, domain))]
 
