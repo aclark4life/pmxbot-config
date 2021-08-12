@@ -7,6 +7,7 @@ import tempfile
 import pathlib
 import io
 
+import keyring
 from fabric import task
 
 host = 'kafka2'
@@ -47,38 +48,36 @@ def sudo(c, command):
 
 @task(hosts=hosts)
 def install_config(c):
-	bot_pass = getpass.getpass('IRC Nick password [skip]> ')
-	db_pass = getpass.getpass('MongoDB password for pmxbot [skip]> ')
-	twilio_token = getpass.getpass('Token for twilio [skip]> ')
-	google_trans_key = getpass.getpass('Google Translate key [skip]> ')
-	wolframalpha_key = getpass.getpass('Wolfram|Alpha key [skip]> ')
+	bot_pass = keyring.get_password('https://libera.chat', 'pmxbot')
+	db_pass = keyring.get_password(
+		'mongodb+srv://pmxbot.gsemc.mongodb.net/dcpython', 'pmxbot')
+	twilio_token = keyring.get_password(
+		'twilio', 'AC00c9739a1539392c4a97f5dc3f5d94c2')
+	google_trans_key = keyring.get_password('Google Translate', 'pmxbot')
+	wolframalpha_key = keyring.get_password(
+		'https://api.wolframalpha.com/', 'jaraco')
 	sudo(c, 'mkdir -p /etc/pmxbot')
 	upload_template(
 		c, 'pmxbot.conf', '/etc/pmxbot/main.conf',
 		password=bot_pass,
 	)
 	upload_template(c, 'web.conf', '/etc/pmxbot/web.conf')
-	if not exists(c, '/etc/pmxbot/server.conf'):
-		upload_template(c, 'server.conf', '/etc/pmxbot/server.conf')
-	if db_pass or not exists(c, '/etc/pmxbot/database.conf'):
-		upload_template(
-			c, 'database.conf', '/etc/pmxbot/database.conf',
-			password=db_pass, mode=0o600)
-	if twilio_token or not exists(c, '/etc/pmxbot/twilio.conf'):
-		upload_template(
-			c,
-			'twilio.conf', '/etc/pmxbot/twilio.conf',
-			token=twilio_token, mode=0o600)
-	if google_trans_key or not exists(c, '/etc/pmxbot/trans.conf'):
-		upload_template(
-			c,
-			'trans.conf', '/etc/pmxbot/trans.conf',
-			key=google_trans_key, mode=0o600)
-	if wolframalpha_key or not exists(c, '/etc/pmxbot/wolframalpha.conf'):
-		upload_template(
-			c,
-			'wolframalpha.conf', '/etc/pmxbot/wolframalpha.conf',
-			key=wolframalpha_key, mode=0o600)
+	upload_template(c, 'server.conf', '/etc/pmxbot/server.conf')
+	upload_template(
+		c, 'database.conf', '/etc/pmxbot/database.conf',
+		password=db_pass, mode=0o600)
+	upload_template(
+		c,
+		'twilio.conf', '/etc/pmxbot/twilio.conf',
+		token=twilio_token, mode=0o600)
+	upload_template(
+		c,
+		'trans.conf', '/etc/pmxbot/trans.conf',
+		key=google_trans_key, mode=0o600)
+	upload_template(
+		c,
+		'wolframalpha.conf', '/etc/pmxbot/wolframalpha.conf',
+		key=wolframalpha_key, mode=0o600)
 
 
 @task(hosts=hosts)
